@@ -1,0 +1,12 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical" >
+    <TextView android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="@string/hello_world"/>
+    <Button android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="search_device" android:id="@+id/bt1" />"
+    <EditText android:layout_width="fill_parent" android:layout_height="wrap_content" android:id="@+id/ed1" />
+	<Button android:id="@+id/bt2" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="send"/>
+    <TextView android:id="@+id/tv1" android:layout_width="fill_parent" android:layout_height="wrap_content"/>
+    <Button android:id="@+id/bt3" android:layout_width="fill_parent" android:layout_height="wrap_content" android:text="close" />
+
+</LinearLayout>
