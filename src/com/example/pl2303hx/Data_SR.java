@@ -12,6 +12,7 @@ import android.hardware.usb.UsbManager;
 import android.os.Handler;
 import android.os.Message;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class Data_SR {
 	
@@ -26,6 +27,7 @@ public class Data_SR {
 	byte[] setup_ = new byte[7];
 	public boolean latch = false;
 	private TextView tv1;
+	private StringBuilder mStringBuilder = null;
 	
 	public Data_SR(UsbManager mUsbManager,UsbDevice mUsbDevice,Context context,TextView tv1){
 		this.mUsbManager = mUsbManager;
@@ -51,10 +53,11 @@ public class Data_SR {
 	public boolean initialize(){
 		if(!mUsbManager.hasPermission(mUsbDevice))return false;
 		mUsbInterface = mUsbDevice.getInterface(0); if(mUsbInterface==null)return false;
-		mUE00 = mUsbInterface.getEndpoint(0); if((mUE00.getType()!=UsbConstants.USB_ENDPOINT_XFER_INT)||(mUE00.getDirection()!=UsbConstants.USB_DIR_IN))return false;
-		mUE01 = mUsbInterface.getEndpoint(1); if((mUE01.getType()!=UsbConstants.USB_ENDPOINT_XFER_BULK)||(mUE01.getDirection()!=UsbConstants.USB_DIR_OUT))return false;
-		mUE02 = mUsbInterface.getEndpoint(2); if((mUE02.getType()!=UsbConstants.USB_ENDPOINT_XFER_BULK)||(mUE02.getDirection()!=UsbConstants.USB_DIR_IN))return false;
-		mUsbDeviceConnection = mUsbManager.openDevice(mUsbDevice); if(mUsbDeviceConnection==null)return false; if(!mUsbDeviceConnection.claimInterface(mUsbInterface, true))return false;
+		mUE00 = mUsbInterface.getEndpoint(0); if((mUE00.getType()!=UsbConstants.USB_ENDPOINT_XFER_INT)||(mUE00.getDirection()!=UsbConstants.USB_DIR_IN))return false; //interrupt
+		mUE01 = mUsbInterface.getEndpoint(1); if((mUE01.getType()!=UsbConstants.USB_ENDPOINT_XFER_BULK)||(mUE01.getDirection()!=UsbConstants.USB_DIR_OUT))return false; //TX
+		mUE02 = mUsbInterface.getEndpoint(2); if((mUE02.getType()!=UsbConstants.USB_ENDPOINT_XFER_BULK)||(mUE02.getDirection()!=UsbConstants.USB_DIR_IN))return false; //RX
+		mUsbDeviceConnection = mUsbManager.openDevice(mUsbDevice);if(mUsbDeviceConnection==null)return false;
+		if(!mUsbDeviceConnection.claimInterface(mUsbInterface, true))return false;
 		
 		new Thread(new Runnable(){
 
@@ -125,6 +128,7 @@ public class Data_SR {
 			@Override
 			public void run() {
 				// TODO Auto-generated method stub
+				
 				while(latch){
 					read_data();
 				}
@@ -133,15 +137,45 @@ public class Data_SR {
 	}
 	
 	private void read_data(){
+		int totalBytesRead = 0;
+		int readPos = 1;
+		int length = 28;
+		int ret = 0;
+		int offset = 0;
+		
 		int max_size = mUE02.getMaxPacketSize();
 		byte[] buffer = new byte[max_size];
-		int ret = mUsbDeviceConnection.bulkTransfer(mUE02, buffer, max_size, 0);
-		if(ret>0){
+		byte[] readBuffer = new byte[max_size];
+		
+		/*while(totalBytesRead < length){
+			if(readPos>ret-1){
+				ret = mUsbDeviceConnection.bulkTransfer(mUE02, buffer, 4096, 100);
+				if(ret>0)readPos=0;
+			}
+			if(ret>0){
+				System.arraycopy(readBuffer, readPos, buffer, 0, ret-readPos);
+				offset = offset + ret - readPos;
+				totalBytesRead = totalBytesRead + ret -readPos;
+				readPos = ret -readPos;
+			}
+		}*/
+		if(mUsbDeviceConnection.bulkTransfer(mUE02, buffer, 4096, 100)>0){
+			for(int i=2;i<4096;i++){
+				mStringBuilder.append((char)(buffer[i]));
+				Message msg = new Message();
+				msg.what = 2;
+				msg.obj = mStringBuilder;
+				handler.sendMessage(msg);
+			}
+		}
+		
+		
+		/*if(ret>0){
 			Message msg = new Message();
 			msg.what = 1;
 			msg.obj = buffer;
 			handler.sendMessage(msg);
-		}
+		}*/
 	}
 	
 	public Handler handler = new Handler(){
@@ -150,16 +184,29 @@ public class Data_SR {
 			case 1:
 				try {
 					byte[] buffer = (byte[]) msg.obj;
-					tv1.setText(tv1.getText().toString()+new String(buffer,"utf-8"));
-				} catch (UnsupportedEncodingException e) {
+					Toast.makeText(context, ""+byte2String(buffer), Toast.LENGTH_SHORT).show();
+				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
+				break;
+			case 2:
+				tv1.setText(mStringBuilder);
 				break;
 			}
 			super.handleMessage(msg);
 		}
 	};
+	
+	public int byte2String(byte[] buffer){
+		int i=0;
+		for(i=0;i<buffer.length;i++){
+			if(String.valueOf(buffer[i]).equals("")){
+				break;
+			}
+		}
+		return i;
+	}
 	
 	public void close(){
 		latch=false;
